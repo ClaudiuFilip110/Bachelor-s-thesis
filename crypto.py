@@ -49,7 +49,7 @@ The algorithm will learn by shifting through the learning set.
 SEQ_LEN = 60
 FUTURE_PERIOD_TO_PREDICT = 3
 COIN_TO_PREDICT = "BTC-USD"
-VALIDATION_PCT = 0.05
+VALIDATION_PCT = 0.15
 
 # we will need a clasifier so that we will know whether the price goes up or down
 def classify(current, future):
@@ -74,10 +74,10 @@ We will do that with a 95 - 5 split.
 We will not shuffle the dataset because that would not be in our advantage.
 """
 times = sorted(main_df.index.values)
-last_5_pct = times[-int(VALIDATION_PCT * len(times))]
+last_15_pct = times[-int(VALIDATION_PCT * len(times))]
 
-validation_main_df = main_df[main_df.index >= last_5_pct]
-main_df = main_df[main_df.index < last_5_pct]
+validation_main_df = main_df[main_df.index >= last_15_pct]
+main_df = main_df[main_df.index < last_15_pct]
 # print(validation_main_df.head())
 # print(main_df.head())
 # print(main_df['future'].isna().sum() * 100 /len(main_df['future']))
@@ -86,6 +86,9 @@ main_df = main_df[main_df.index < last_5_pct]
 as we can see we have a looot of missing values, about 5.8% of them in the training set and 0.08% in the validation set
 so we will have to figure a way how to deal with them.
 """
+
+main_df.dropna(inplace=True)
+validation_main_df.dropna(inplace=True)
 
 """
 Now that we've separated the data into validation and training sets, should we shuffle the datasets?
@@ -189,6 +192,13 @@ from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint
 from tensorflow.keras.optimizers import SGD, Adam
 # pt CuDNNLSTM look at this https://stackoverflow.com/questions/60468385/is-there-cudnnlstm-or-cudnngru-alternative-in-tensorflow-2-0
 
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import InteractiveSession
+
+config = ConfigProto()
+config.gpu_options.allow_growth = True
+session = InteractiveSession(config=config)
+
 '''
 model:
 lstm
@@ -207,15 +217,15 @@ BATCH_SIZE = 32
 NAME = f"{COIN_TO_PREDICT}-{SEQ_LEN}-SEQ-{FUTURE_PERIOD_TO_PREDICT}-PRED-{int(time.time())}"
 
 model = Sequential()
-model.add(LSTM(64, return_sequences=True))
+model.add(LSTM(128, return_sequences=True))
 model.add(Dropout(0.2))
 model.add(BatchNormalization())
 
-model.add(LSTM(64, return_sequences=True))
+model.add(LSTM(128, return_sequences=True))
 model.add(Dropout(0.2))
 model.add(BatchNormalization())
 
-model.add(LSTM(64))
+model.add(LSTM(128))
 model.add(Dropout(0.2))
 model.add(BatchNormalization())
 
@@ -226,8 +236,22 @@ model.add(Dense(2, activation='softmax'))
 
 opt = Adam(learning_rate=0.001, decay=1e-6)
 
-model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
+model.compile(loss='sparse_categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
 
-history = model.fit(x=train_x, y=train_Y, batch_size=BATCH_SIZE, epochs=EPOCHS, validation_data=(test_x, test_Y))
+tensorboard = TensorBoard(log_dir=f'logs/{NAME}')
+filepath = "RNN_Final-{epoch:02d}-{val_accuracy:.3f}"
+checkpoint = ModelCheckpoint("models/{}.model".format(filepath, monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')) # saves only the best ones
 
-# model.save('')
+
+history = model.fit(train_x, train_Y, 
+        batch_size=BATCH_SIZE, 
+        epochs=EPOCHS,
+        validation_data=(test_x, test_Y),
+        callbacks=[tensorboard, checkpoint])
+
+# # Score model
+score = model.evaluate(test_x, test_Y, verbose=0)
+print('Test loss:', score[0])
+print('Test accuracy:', score[1])
+# # Save model
+model.save(f"models/{NAME}")
