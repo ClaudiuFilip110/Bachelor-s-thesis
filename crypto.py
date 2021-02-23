@@ -47,9 +47,9 @@ The algorithm will learn by shifting through the learning set.
 """
 
 SEQ_LEN = 60
-FUTURE_PERIOD_TO_PREDICT = 3
-COIN_TO_PREDICT = "BTC-USD"
-VALIDATION_PCT = 0.15
+FUTURE_PRED = 3
+COIN = "ETH-USD"
+VAL_PCT = 0.15
 
 # we will need a clasifier so that we will know whether the price goes up or down
 def classify(current, future):
@@ -60,13 +60,13 @@ def classify(current, future):
 
 
 # add a future column that will be the price in 3 mins
-main_df["future"] = main_df[f"{COIN_TO_PREDICT}-close"].shift(-FUTURE_PERIOD_TO_PREDICT)
-# print(main_df[[f'{COIN_TO_PREDICT}-close', 'future']].head())
+main_df["future"] = main_df[f"{COIN}-close"].shift(-FUTURE_PRED)
+# print(main_df[[f'{COIN}-close', 'future']].head())
 
 # add a target column that will be classification of the price
-# print(classify(main_df[f'{COIN_TO_PREDICT}-close'],main_df['future']))
+# print(classify(main_df[f'{COIN}-close'],main_df['future']))
 main_df["target"] = list(
-    map(classify, main_df[f"{COIN_TO_PREDICT}-close"], main_df["future"])
+    map(classify, main_df[f"{COIN}-close"], main_df["future"])
 )
 """
 Now we need to separate into training and validation sets.
@@ -74,7 +74,7 @@ We will do that with a 95 - 5 split.
 We will not shuffle the dataset because that would not be in our advantage.
 """
 times = sorted(main_df.index.values)
-last_15_pct = times[-int(VALIDATION_PCT * len(times))]
+last_15_pct = times[-int(VAL_PCT * len(times))]
 
 validation_main_df = main_df[main_df.index >= last_15_pct]
 main_df = main_df[main_df.index < last_15_pct]
@@ -199,23 +199,6 @@ config = ConfigProto()
 config.gpu_options.allow_growth = True
 session = InteractiveSession(config=config)
 
-'''
-model:
-lstm
-dropout
-normalization
-x3
-dense
-dropout
-optimizer --
-loss -------
-accuracy ---
-'''
-
-EPOCHS = 10
-BATCH_SIZE = 32
-NAME = f"{COIN_TO_PREDICT}-{SEQ_LEN}-SEQ-{FUTURE_PERIOD_TO_PREDICT}-PRED-{int(time.time())}"
-
 model = Sequential()
 model.add(LSTM(128, return_sequences=True))
 model.add(Dropout(0.2))
@@ -235,13 +218,18 @@ model.add(Dropout(0.2))
 model.add(Dense(2, activation='softmax'))
 
 opt = Adam(learning_rate=0.001, decay=1e-6)
+LOSS='sparse_categorical_crossentropy'
 
-model.compile(loss='sparse_categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
+model.compile(loss=LOSS, optimizer=opt, metrics=['accuracy'])
+
+EPOCHS = 10
+BATCH_SIZE = 32
+NAME = f"{COIN}-{FUTURE_PRED}-VALID-PCT-{VAL_PCT}-LOSS-{LOSS}-OPT-{'Adam'}-{int(time.time())}"
+# NAME = f"{RATIO_TO_PREDICT}-{SEQ_LEN}-SEQ-{FUTURE_PERIOD_PREDICT}-PRED-{int(time.time())}"
 
 tensorboard = TensorBoard(log_dir=f'logs/{NAME}')
 filepath = "RNN_Final-{epoch:02d}-{val_accuracy:.3f}"
 checkpoint = ModelCheckpoint("models/{}.model".format(filepath, monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')) # saves only the best ones
-
 
 history = model.fit(train_x, train_Y, 
         batch_size=BATCH_SIZE, 
