@@ -47,7 +47,7 @@ The algorithm will learn by shifting through the learning set.
 """
 
 SEQ_LEN = 60
-FUTURE_PRED = 3
+FUTURE_PRED = 10
 COIN = "ETH-USD"
 VAL_PCT = 0.15
 
