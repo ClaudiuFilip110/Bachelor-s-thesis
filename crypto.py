@@ -47,9 +47,9 @@ The algorithm will learn by shifting through the learning set.
 """
 
 SEQ_LEN = 60
-FUTURE_PRED = 10
-COIN = "ETH-USD"
-VAL_PCT = 0.15
+FUTURE_PRED = 120
+COIN = "BTC-USD"
+VAL_PCT = 0.20
 
 # we will need a clasifier so that we will know whether the price goes up or down
 def classify(current, future):
@@ -87,6 +87,8 @@ as we can see we have a looot of missing values, about 5.8% of them in the train
 so we will have to figure a way how to deal with them.
 """
 
+main_df.fillna(method="ffill", inplace=True)
+validation_main_df.fillna(method="ffill", inplace=True)
 main_df.dropna(inplace=True)
 validation_main_df.dropna(inplace=True)
 
@@ -224,18 +226,19 @@ model.compile(loss=LOSS, optimizer=opt, metrics=['accuracy'])
 
 EPOCHS = 10
 BATCH_SIZE = 32
-NAME = f"{COIN}-{FUTURE_PRED}-VALID-PCT-{VAL_PCT}-LOSS-{LOSS}-OPT-{'Adam'}-{int(time.time())}"
+NAME = f"{COIN}-{SEQ_LEN}-{FUTURE_PRED}-VALID-PCT-{VAL_PCT}-LOSS-{LOSS}-OPT-{'Adam'}-{int(time.time())}"
 # NAME = f"{RATIO_TO_PREDICT}-{SEQ_LEN}-SEQ-{FUTURE_PERIOD_PREDICT}-PRED-{int(time.time())}"
 
 tensorboard = TensorBoard(log_dir=f'logs/{NAME}')
 filepath = "RNN_Final-{epoch:02d}-{val_accuracy:.3f}"
 checkpoint = ModelCheckpoint("models/{}.model".format(filepath, monitor='val_accuracy', verbose=1, save_best_only=True, mode='max')) # saves only the best ones
 
-history = model.fit(train_x, train_Y, 
+learner = model.fit(train_x, train_Y, 
         batch_size=BATCH_SIZE, 
         epochs=EPOCHS,
         validation_data=(test_x, test_Y),
-        callbacks=[tensorboard, checkpoint])
+        # callbacks=[tensorboard, checkpoint])
+        callbacks=[tensorboard])
 
 # # Score model
 score = model.evaluate(test_x, test_Y, verbose=0)
