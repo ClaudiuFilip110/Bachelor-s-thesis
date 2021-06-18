@@ -4,16 +4,14 @@ import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.claudiu.aplicatie_licenta.ml.ModelAndroid
+import kotlinx.android.synthetic.main.activity_start.*
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
 import java.io.*
-import java.nio.ByteBuffer
 import java.util.*
-
 
 class StartActivity : AppCompatActivity() {
 
@@ -27,10 +25,14 @@ class StartActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_start)
+        initComponents()
         verifyStoragePermissions(this)
-        model()
+        predict_coin()
     }
 
+    private fun initComponents() {
+        app_icon.setImageResource(R.drawable.cryptopred)
+    }
 
     fun verifyStoragePermissions(activity: Activity?) {
         // Check if we have write permission
@@ -48,18 +50,14 @@ class StartActivity : AppCompatActivity() {
         }
     }
 
-    fun readFromFile(file: File): Array<Array<FloatArray>>{
-
+    private fun readFromFile(file: File): Array<Array<FloatArray>> {
         val input: InputStream
-
         input = FileInputStream(file)
-
         val a = Array(1) {
             Array(16) {
                 FloatArray(9)
             }
         }
-
         val reader = BufferedReader(InputStreamReader(input))
         for (row in a[0].indices) {
             val linee: String = reader.readLine()
@@ -68,45 +66,16 @@ class StartActivity : AppCompatActivity() {
                 a[0][row][it] = lineElems[it].toFloat()
             }
         }
-
         input.close()
         return a
     }
 
-    fun model() {
-        if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-            val sdcard = this.filesDir
-            val file = File("$sdcard", "INFERENCE_DATA")
-
-
-            /** deprecated version of code
-            var byteBuffer : ByteBuffer =  ByteBuffer.allocate(1*16*9*4)
-            for (row in a[0].indices) {
-                for (it in a[0][row].indices) {
-                    byteBuffer.putFloat(a[0][row][it])
-                }
-            }
-             ....
-
-            inputFeature0.loadBuffer(byteBuffer)
-            */
-
-            val a = readFromFile(file)
-            var floatVector = shrinkShapeForModel(a)
-            val probabilities = modelInference(floatVector)
-
-            val output = determineOutputFromProbabilites(probabilities)
-
-            text = "The price of the certain coin is predicted to be $output than before"
-        }
-    }
-
     private fun determineOutputFromProbabilites(probabilities: FloatArray): String {
         val maxIdx = probabilities.indices.maxBy { probabilities[it] } ?: -1
-        return if(maxIdx == 1)
-            "higher"
+        return if (maxIdx == 1)
+            "va creste"
         else
-            "lower"
+            "va scadea"
     }
 
     private fun modelInference(floatVector: FloatArray): FloatArray {
@@ -130,5 +99,32 @@ class StartActivity : AppCompatActivity() {
             }
         }
         return floatVector
+    }
+
+    private fun predict_coin() {
+        if (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+            val sdcard = this.filesDir
+            val file = File("$sdcard", "INFERENCE_DATA")
+
+            /** deprecated version of code
+            var byteBuffer : ByteBuffer =  ByteBuffer.allocate(1*16*9*4)
+            for (row in a[0].indices) {
+                for (it in a[0][row].indices) {
+                    byteBuffer.putFloat(a[0][row][it])
+                }
+            }
+            ....
+
+            inputFeature0.loadBuffer(byteBuffer)
+             */
+
+            val a = readFromFile(file)
+            var floatVector = shrinkShapeForModel(a)
+            val probabilities = modelInference(floatVector)
+            val output = determineOutputFromProbabilites(probabilities)
+
+            text = "Pretul criptomonedei $output fata de valoarea initiala"
+            tf_output.text = text
+        }
     }
 }
